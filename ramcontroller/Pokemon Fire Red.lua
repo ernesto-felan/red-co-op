@@ -9,6 +9,7 @@ local partyIndexs = {
 	[5] = 0x024414,
 	[6] = 0x024478
 }
+local pcBoxAddress = 0x029318
 
 -- console.log(domain_list)
 -- Reads a value from RAM using little endian
@@ -65,7 +66,19 @@ function writeRAM(domain, address, size, value)
 	end
 end
 
-function readPokemon(partyIndex)
+function addToSet(set, key)
+    set[key] = true
+end
+
+function removeFromSet(set, key)
+    set[key] = nil
+end
+
+function setContains(set, key)
+    return set[key] ~= nil
+end
+
+function getPokemon(partyIndex)
 	return memory.readbyterange(partyIndexs[partyIndex], 100, "Combined WRAM")
 end
 
@@ -75,10 +88,25 @@ function writePokemon(partyOffset, pokemonData)
 	end
 end
 
-function addNewPokemon(pokemonData)
-	prevRAM.partySize = prevRAM.partySize + 1
+function addToBox(pokemonData)
+	for k,v in pairs(pokemonData) do
+		if(k<80) then
+			memory.writebyte(pcBoxAddress + k, v)
+		end
+	end
+end
+
+function replacePokemon(prevRAM, pokemonData)
+	local oldPokemon = getPokemon(prevRAM.partySize)
+	prevRAM.pokemonToAdd = oldPokemon
 	writePokemon(partyIndexs[prevRAM.partySize], pokemonData)
-	return prevRam
+	return prevRAM
+end
+
+function addPokemon(prevRAM, pokemonData)
+	prevRAM.partySize = prevRAM.partySize
+	writePokemon(partyIndexs[prevRAM.partySize], pokemonData)
+	return prevRAM.partySize
 end
 
 function getPartySize()
@@ -87,17 +115,20 @@ end
 
 -- RAM state from previous frame
 local prevRAM = {
-	partySize = 1 -- assume at least one pokemon to not send starter
+	partySize = getPartySize(), -- assume at least one pokemon to not send starter
+	pokemonToAdd = {}
 }
+
+local send_player_name = false
+local player_names = {}
 
 -- Event to check when a new pokemon is added
 function eventPokemonCollected(prevRam, newRam)
-	
 	if (prevRam.partySize < newRam.partySize) then
 		return getPokemon(newRam.partySize)
+	else
+		return false
 	end
-
-	return false
 end
 
 -- Gets a message to send to the other player of new changes
@@ -106,11 +137,11 @@ end
 function pfr_ram.getMessage()
 	-- Gets the current RAM state
 	local newRAM = {
-		partySize = getPartySize()
+		partySize = getPartySize(),
+		pokemonToAdd = prevRAM.pokemonToAdd
 	}
 	local message = {}
 	local changed = false
-
 	-- Gets the message for a new collected pokemon
 	local newPokemon = eventPokemonCollected(prevRAM, newRAM)
 	if newPokemon then
@@ -119,6 +150,21 @@ function pfr_ram.getMessage()
 		changed = true
 
 		gui.addmessage(config.user .. ": sending new pokemon")
+	end
+
+	if next(prevRAM.pokemonToAdd) ~= nil then
+		message["a"] = prevRAM.pokemonToAdd
+		prevRAM.pokemonToAdd = {}
+		newRAM.pokemonToAdd = {}
+		changed = true
+		gui.addmessage(config.user .. ": sending old pokemon")
+	end
+
+	-- send my player name if event is queued
+	if send_player_name then
+		changed = true
+		send_player_name = false
+		message["n"] = config.user
 	end
 
 	-- Update the frame pointer
@@ -135,10 +181,33 @@ end
 
 -- Process a message from another player and update RAM
 function pfr_ram.processMessage(their_user, message)
+	-- "i" type is for handling item split events, which
+	-- is not something this ram controller does. However
+	-- this event will happen any time a player joins,
+	-- so we will send player names again and reload the
+	-- script's save data for stability
+	if message["i"] then
+		addToSet(player_names, config.user)
+		send_player_name = true
+	end
+
+	-- player name message from another player
+	if message["n"] then
+		if (setContains(player_names, their_user) == false) then
+			addToSet(player_names, their_user)
+		end
+	end
+
 	-- Process new pokemon that was given
 	if message["p"] then
-		prevRAM = addNewPokemon(message["p"])
+		prevRAM = replacePokemon(prevRAM, message["p"])
+	end
+
+	if message["a"] then
+		prevRAM.partySize = addPokemon(prevRAM, message["a"])
 	end
 end
+-- console.log(getPartySize())
 pfr_ram.itemcount = 100
+
 return pfr_ram
