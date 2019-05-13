@@ -98,9 +98,8 @@ end
 
 function replacePokemon(prevRAM, pokemonData)
 	local oldPokemon = getPokemon(prevRAM.partySize)
-	prevRAM.pokemonToAdd = oldPokemon
 	writePokemon(partyIndexs[prevRAM.partySize], pokemonData)
-	return prevRAM
+	return oldPokemon
 end
 
 function addPokemon(prevRAM, pokemonData)
@@ -116,7 +115,8 @@ end
 -- RAM state from previous frame
 local prevRAM = {
 	partySize = getPartySize(), -- assume at least one pokemon to not send starter
-	pokemonToAdd = {}
+	pokemonToAdd = {},
+	nextMessage = {}
 }
 
 local send_player_name = false
@@ -138,26 +138,45 @@ function pfr_ram.getMessage()
 	-- Gets the current RAM state
 	local newRAM = {
 		partySize = getPartySize(),
-		pokemonToAdd = prevRAM.pokemonToAdd
+		pokemonToAdd = prevRAM.pokemonToAdd,
+		nextMessage = prevRAM.nextMessage
 	}
 	local message = {}
 	local changed = false
 	-- Gets the message for a new collected pokemon
 	local newPokemon = eventPokemonCollected(prevRAM, newRAM)
 	if newPokemon then
+		next_player,_ = next(player_names, config.user)
 		-- Add new changes
-		message["p"] = newPokemon
+		message["p"] = {
+			original_player = config.user,
+			player = next_player,
+			pokemon = newPokemon
+		}
 		changed = true
 
 		gui.addmessage(config.user .. ": sending new pokemon")
 	end
 
 	if next(prevRAM.pokemonToAdd) ~= nil then
-		message["a"] = prevRAM.pokemonToAdd
+		next_player,_ = next(player_names, config.user)
+		-- Add new changes
+		message["a"] = {
+			player = next_player,
+			pokemon = prevRAM.pokemonToAdd
+		}
 		prevRAM.pokemonToAdd = {}
 		newRAM.pokemonToAdd = {}
 		changed = true
-		gui.addmessage(config.user .. ": sending old pokemon")
+		gui.addmessage(config.user .. ": sending pokemon")
+	end
+
+	if next(prevRAM.nextMessage) ~= nil then
+		message["p"] = prevRAM.nextMessage
+		prevRAM.nextMessage = {}
+		newRAM.nextMessage = {}
+		changed = true
+		gui.addmessage(config.user .. ": sending pokemon")
 	end
 
 	-- send my player name if event is queued
@@ -200,11 +219,28 @@ function pfr_ram.processMessage(their_user, message)
 
 	-- Process new pokemon that was given
 	if message["p"] then
-		prevRAM = replacePokemon(prevRAM, message["p"])
+		if message["p"]["player"] == config.user then
+			console.log("original_player")
+			console.log(message["p"]["original_player"])
+			oldPokemon = replacePokemon(prevRAM, message["p"]["pokemon"])
+			next_player,_ = next(player_names, config.user)
+			console.log("next_player")
+			console.log(next_player)
+			if next_player == message["p"]["original_player"] then
+				prevRAM.pokemonToAdd = oldPokemon
+			end
+			if next_player ~= message["p"]["original_player"] then
+				prevRAM.nextMessage = message["p"]
+				prevRAM.nextMessage["pokemon"] = oldPokemon
+				prevRAM.nextMessage["player"] = next_player
+			end
+		end
 	end
 
 	if message["a"] then
-		prevRAM.partySize = addPokemon(prevRAM, message["a"])
+		if message["a"]["player"] == config.user then
+			prevRAM.partySize = addPokemon(prevRAM, message["a"]["pokemon"])
+		end
 	end
 end
 -- console.log(getPartySize())
