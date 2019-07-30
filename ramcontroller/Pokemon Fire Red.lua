@@ -9,7 +9,7 @@ local partyIndexs = {
 	[5] = 0x024414,
 	[6] = 0x024478
 }
-local pcBoxAddress = 0x029318
+local pcBoxAddress = 0x029394
 
 -- console.log(domain_list)
 -- Reads a value from RAM using little endian
@@ -89,6 +89,7 @@ function writePokemon(partyOffset, pokemonData)
 end
 
 function addToBox(pokemonData)
+	console.log("adding pokemon to box")
 	for k,v in pairs(pokemonData) do
 		if(k<80) then
 			memory.writebyte(pcBoxAddress + k, v)
@@ -146,14 +147,18 @@ function pfr_ram.getMessage()
 	-- Gets the message for a new collected pokemon
 	local newPokemon = eventPokemonCollected(prevRAM, newRAM)
 	if newPokemon then
-		next_player,_ = next(player_names, config.user)
-		-- Add new changes
-		message["p"] = {
-			original_player = config.user,
-			player = next_player,
-			pokemon = newPokemon
-		}
-		changed = true
+		addToBox(newPokemon)
+		-- next_player,_ = next(player_names, config.user)
+		-- if next_player == nil then
+		-- 	next_player,_ = next(player_names)
+		-- end
+		-- -- Add new changes
+		-- message["p"] = {
+		-- 	original_player = config.user,
+		-- 	player = next_player,
+		-- 	pokemon = newPokemon
+		-- }
+		-- changed = true
 
 		gui.addmessage(config.user .. ": sending new pokemon")
 	end
@@ -218,6 +223,7 @@ function pfr_ram.processMessage(their_user, message)
 		if (setContains(player_names, their_user) == false) then
 			addToSet(player_names, their_user)
 		end
+		console.log(player_names)
 	end
 
 	-- Process new pokemon that was given
@@ -252,7 +258,6 @@ function pfr_ram.processMessage(their_user, message)
 		end
 	end
 end
--- console.log(getPartySize())
 pfr_ram.itemcount = 100
 
 return pfr_ram
