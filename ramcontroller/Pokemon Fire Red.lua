@@ -103,8 +103,11 @@ function addToBox(pokemonData)
 end
 
 function replacePokemon(prevRAM, pokemonData)
-	local oldPokemon = getPokemon(prevRAM.partySize)
-	writePokemon(partyIndexs[prevRAM.partySize], pokemonData)
+	slotToReplace = math.random(prevRAM.partySize)
+	console.log("taking pokemon in slot:")
+	console.log(slotToReplace)
+	local oldPokemon = getPokemon(slotToReplace)
+	writePokemon(partyIndexs[slotToReplace], pokemonData)
 	return oldPokemon
 end
 
@@ -258,7 +261,7 @@ function pfr_ram.processMessage(their_user, message)
 
 	if message["a"] then
 		if message["a"]["player"] == config.user then
-			if prevRam.partySize == 5 then
+			if getPartySize() == 5 then
 				addToBox(message["a"]["pokemon"])
 			else
 				prevRAM.partySize = addPokemon(prevRAM, message["a"]["pokemon"])
@@ -267,5 +270,4 @@ function pfr_ram.processMessage(their_user, message)
 	end
 end
 pfr_ram.itemcount = 100
-
 return pfr_ram
