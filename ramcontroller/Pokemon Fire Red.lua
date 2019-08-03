@@ -123,7 +123,7 @@ end
 
 -- RAM state from previous frame
 local prevRAM = {
-	partySize = getPartySize(), -- assume at least one pokemon to not send starter
+	partySize = getPartySize(),
 	pokemonToAdd = {},
 	nextMessage = {}
 }
@@ -238,9 +238,6 @@ function pfr_ram.processMessage(their_user, message)
 		console.log("GOT P MESSAGE for:")
 		console.log(message["p"]["player"])
 		if message["p"]["player"] == config.user then
-			console.log("original_player")
-			console.log(message["p"]["original_player"])
-			oldPokemon = replacePokemon(prevRAM, message["p"]["pokemon"])
 			next_player,_ = next(player_names, config.user)
 			if next_player == nil then
 				console.log("we are last player setting next player to first player")
@@ -248,6 +245,13 @@ function pfr_ram.processMessage(their_user, message)
 			end
 			console.log("next_player")
 			console.log(next_player)
+			local oldPokemon
+			if getPartySize() == 0 then
+				oldPokemon = message["p"]["pokemon"]
+			else
+				oldPokemon = replacePokemon(prevRAM, message["p"]["pokemon"])
+			end
+
 			if next_player == message["p"]["original_player"] then
 				prevRAM.pokemonToAdd = oldPokemon
 			end
