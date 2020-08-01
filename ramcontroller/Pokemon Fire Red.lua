@@ -134,7 +134,9 @@ local player_names = {}
 -- Event to check when a new pokemon is added
 function eventPokemonCollected(prevRam, newRam)
 	if (prevRam.partySize < newRam.partySize) then
-		return getPokemon(newRam.partySize)
+		local taken_pokemon = getPokemon(newRam.partySize)
+		console.log(taken_pokemon)
+		return taken_pokemon
 	else
 		return false
 	end
@@ -159,6 +161,10 @@ function pfr_ram.getMessage()
 		if next_player == nil then
 			next_player,_ = next(player_names)
 		end
+		console.log("Sending new pokemon to:")
+		console.log(next_player)
+		console.log("\nCurrent list of players")
+		console.log(player_names)
 		-- Add new changes
 		message["p"] = {
 			original_player = config.user,
@@ -173,6 +179,7 @@ function pfr_ram.getMessage()
 	if next(prevRAM.pokemonToAdd) ~= nil then
 		next_player,_ = next(player_names, config.user)
 		if next_player == nil then
+			console.log("we are last player setting next player to first player")
 			next_player,_ = next(player_names)
 		end
 		-- Add new changes
@@ -265,7 +272,10 @@ function pfr_ram.processMessage(their_user, message)
 
 	if message["a"] then
 		if message["a"]["player"] == config.user then
+			console.log("GOT A MESSAGE for:")
+			console.log(message["a"]["player"])
 			if getPartySize() == 5 then
+				console.log("party is 5 sending to box")
 				addToBox(message["a"]["pokemon"])
 			else
 				prevRAM.partySize = addPokemon(prevRAM, message["a"]["pokemon"])
